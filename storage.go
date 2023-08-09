@@ -10,6 +10,7 @@ import (
 
 type Storage interface {
 	CreateAccount(*Account) error
+	GetAccounts() ([]*Account, error)
 	GetAccountById(int) (*Account, error)
 	UpdateAccount(*Account) error
 	DeleteAccount(int) error
@@ -47,7 +48,7 @@ func (s *PostgresStore) CreateAccountTable() error {
 		first_name VARCHAR(55),
 		last_name VARCHAR(55),
 		number SERIAL,
-		balance DECIMAL(10, 2),
+		balance SERIAL,
 		created_at TIMESTAMP
 	)`
 
@@ -75,8 +76,57 @@ func (s *PostgresStore) CreateAccount(acc *Account) error {
 	return nil
 }
 
+func (s *PostgresStore) GetAccounts() ([]*Account, error) {
+	rows, err := s.db.Query("SELECT * FROM accounts")
+
+	if err != nil {
+		return nil, err
+	}
+
+	accounts := []*Account{}
+	for rows.Next() {
+		account := new(Account)
+		err := rows.Scan(
+			&account.ID,
+			&account.FirstName,
+			&account.LastName,
+			&account.Number,
+			&account.Balance,
+			&account.CreatedAt)
+
+		if err != nil {
+			return nil, err
+		}
+
+		accounts = append(accounts, account)
+	}
+
+	return accounts, nil
+}
+
 func (s *PostgresStore) GetAccountById(id int) (*Account, error) {
-	return nil, nil
+	rows, err := s.db.Query("SELECT * FROM accounts WHERE id = $1", id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	account := new(Account)
+
+	rows.Next()
+	err2 := rows.Scan(
+		&account.ID,
+		&account.FirstName,
+		&account.LastName,
+		&account.Number,
+		&account.Balance,
+		&account.CreatedAt)
+
+	if err2 != nil {
+		return nil, err2
+	}
+
+	return account, nil
 }
 
 func (s *PostgresStore) UpdateAccount(*Account) error {
