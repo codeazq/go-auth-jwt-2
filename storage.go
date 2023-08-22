@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
 	_ "github.com/lib/pq"
 )
@@ -62,7 +61,6 @@ func (s *PostgresStore) CreateAccount(acc *Account) error {
 	VALUES 
 	($1, $2, $3, $4, $5)`
 
-	log.Println("before the query")
 	resp, err := s.db.Query(
 		sqlStatement, acc.FirstName, acc.LastName,
 		acc.Number, acc.Balance, acc.CreatedAt)
@@ -85,14 +83,7 @@ func (s *PostgresStore) GetAccounts() ([]*Account, error) {
 
 	accounts := []*Account{}
 	for rows.Next() {
-		account := new(Account)
-		err := rows.Scan(
-			&account.ID,
-			&account.FirstName,
-			&account.LastName,
-			&account.Number,
-			&account.Balance,
-			&account.CreatedAt)
+		account, err := scanIntoAccount(rows)
 
 		if err != nil {
 			return nil, err
@@ -111,10 +102,40 @@ func (s *PostgresStore) GetAccountById(id int) (*Account, error) {
 		return nil, err
 	}
 
+	for rows.Next() {
+		return scanIntoAccount(rows)
+	}
+
+	return nil, fmt.Errorf("Account with id %d not found", id)
+}
+
+func (s *PostgresStore) UpdateAccount(acc *Account) error {
+	rows, err := s.db.Query(
+		`Update accounts SET first_name = $1, last_name = $2, balance = $3 
+		WHERE id = $4 
+		RETURNING first_name, last_name, number, balance, created_at`,
+		acc.FirstName, acc.LastName,
+		acc.Balance, acc.ID)
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%+v\n", rows)
+
+	return nil
+}
+
+func (s *PostgresStore) DeleteAccount(id int) error {
+	_, err := s.db.Query("DELETE FROM accounts WHERE id = $1", id)
+
+	return err
+}
+
+func scanIntoAccount(rows *sql.Rows) (*Account, error) {
 	account := new(Account)
 
-	rows.Next()
-	err2 := rows.Scan(
+	err := rows.Scan(
 		&account.ID,
 		&account.FirstName,
 		&account.LastName,
@@ -122,17 +143,9 @@ func (s *PostgresStore) GetAccountById(id int) (*Account, error) {
 		&account.Balance,
 		&account.CreatedAt)
 
-	if err2 != nil {
-		return nil, err2
+	if err != nil {
+		return nil, err
 	}
 
 	return account, nil
-}
-
-func (s *PostgresStore) UpdateAccount(*Account) error {
-	return nil
-}
-
-func (s *PostgresStore) DeleteAccount(id int) error {
-	return nil
 }

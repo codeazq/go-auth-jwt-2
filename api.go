@@ -23,7 +23,7 @@ func WriteJSON(w http.ResponseWriter, status int, v any) error {
 }
 
 type ApiError struct {
-	Error string
+	Error string `json:"error"`
 }
 
 type apiFunc func(http.ResponseWriter, *http.Request) error
@@ -46,9 +46,12 @@ func NewAPIServer(listenAddr string, store Storage) *APIServer {
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
 
-	router.HandleFunc("/accounts", makeHTTPHandleFunc(s.handleAccount))
+	router.HandleFunc("/accounts", makeHTTPHandleFunc(s.handleGetAccounts)).Methods("GET")
+	router.HandleFunc("/accounts", makeHTTPHandleFunc(s.handleCreateAccount)).Methods("POST")
 
-	router.HandleFunc("/accounts/{id}", makeHTTPHandleFunc(s.handleGetAccountById))
+	router.HandleFunc("/accounts/{id}", makeHTTPHandleFunc(s.handleDeleteAccount)).Methods("DELETE")
+	router.HandleFunc("/accounts/{id}", makeHTTPHandleFunc(s.handleGetAccountById)).Methods("GET")
+	router.HandleFunc("/accounts/{id}", makeHTTPHandleFunc(s.handleUpdateAccount)).Methods("PUT")
 
 	log.Println("JSON API server running on port: ", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
@@ -81,15 +84,13 @@ func (s *APIServer) handleGetAccounts(w http.ResponseWriter, r *http.Request) er
 }
 
 func (s *APIServer) handleGetAccountById(w http.ResponseWriter, r *http.Request) error {
-	accountId := mux.Vars(r)["id"]
-	ID, parsingErr := strconv.Atoi(accountId)
+	id, err := getParamterFromRequest(r, "id")
 
-	if parsingErr != nil {
-		fmt.Println("error while parsing")
-		return parsingErr
+	if err != nil {
+		return err
 	}
 
-	account, err := s.store.GetAccountById(ID)
+	account, err := s.store.GetAccountById(id)
 
 	if err != nil {
 		return err
@@ -114,10 +115,59 @@ func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) 
 	return WriteJSON(w, http.StatusOK, account)
 }
 
+func (s *APIServer) handleUpdateAccount(w http.ResponseWriter, r *http.Request) error {
+	id, err := getParamterFromRequest(r, "id")
+
+	if err != nil {
+		return err
+	}
+
+	updateAccountRequest := new(UpdateAccountRequest)
+
+	if err := json.NewDecoder(r.Body).Decode(updateAccountRequest); err != nil {
+		return err
+	}
+
+	account, err := s.store.GetAccountById(id)
+	if err != nil {
+		return err
+	}
+
+	account.FirstName = updateAccountRequest.FirstName
+	account.LastName = updateAccountRequest.LastName
+
+	if err := s.store.UpdateAccount(account); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, account)
+}
+
 func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
+	id, err := getParamterFromRequest(r, "id")
+
+	if err != nil {
+		return err
+	}
+
+	if err := s.store.DeleteAccount(id); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]int{"deleted": id})
 }
 
 func (s *APIServer) handleTransfer(w http.ResponseWriter, r *http.Request) error {
 	return nil
+}
+
+func getParamterFromRequest(r *http.Request, parameter string) (int, error) {
+	paramAsString := mux.Vars(r)[parameter]
+	formatedParam, err := strconv.Atoi(paramAsString)
+
+	if err != nil {
+		return formatedParam, fmt.Errorf("error while parsing %s: %s", parameter, paramAsString)
+	}
+
+	return formatedParam, nil
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"math/rand"
 	"time"
 )
@@ -9,6 +8,11 @@ import (
 type CreateAccountRequest struct {
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
+}
+
+type UpdateAccountRequest struct {
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastname"`
 }
 type Account struct {
 	ID        int       `json:"id"`
@@ -20,9 +24,7 @@ type Account struct {
 }
 
 func NewAccount(firstName, lastName string) *Account {
-	log.Println("inside new account")
 	return &Account{
-		// ID:        rand.Intn(10000),
 		FirstName: firstName,
 		LastName:  lastName,
 		Number:    int64(rand.Intn(100000)),
