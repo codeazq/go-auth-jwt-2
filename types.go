@@ -14,6 +14,12 @@ type UpdateAccountRequest struct {
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastname"`
 }
+
+type TranserRequest struct {
+	DestinationAccount int64 `json:"destinationAccount"`
+	Amount             int64 `json:"amount"`
+}
+
 type Account struct {
 	ID        int       `json:"id"`
 	FirstName string    `json:"firstName"`

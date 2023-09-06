@@ -3,10 +3,17 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	store, err := NewPostgresStore()
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	store, err := NewPostgresStore(os.Getenv("DATABASE_DSN"))
 	if err != nil {
 		log.Fatal(err)
 	}

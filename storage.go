@@ -8,7 +8,7 @@ import (
 )
 
 type Storage interface {
-	CreateAccount(*Account) error
+	CreateAccount(*Account) (*Account, error)
 	GetAccounts() ([]*Account, error)
 	GetAccountById(int) (*Account, error)
 	UpdateAccount(*Account) error
@@ -19,10 +19,9 @@ type PostgresStore struct {
 	db *sql.DB
 }
 
-func NewPostgresStore() (*PostgresStore, error) {
-	connStr := "postgresql://postgres:postgres@localhost:5432/go_fintech_bank?sslmode=disable"
+func NewPostgresStore(connectionString string) (*PostgresStore, error) {
 
-	db, err := sql.Open("postgres", connStr)
+	db, err := sql.Open("postgres", connectionString)
 
 	if err != nil {
 		return nil, err
@@ -55,23 +54,26 @@ func (s *PostgresStore) CreateAccountTable() error {
 	return err
 }
 
-func (s *PostgresStore) CreateAccount(acc *Account) error {
+func (s *PostgresStore) CreateAccount(acc *Account) (*Account, error) {
 	sqlStatement := `INSERT INTO accounts 
 	(first_name, last_name, number, balance, created_at)
 	VALUES 
-	($1, $2, $3, $4, $5)`
+	($1, $2, $3, $4, $5)
+	RETURNING *`
 
-	resp, err := s.db.Query(
+	rows, err := s.db.Query(
 		sqlStatement, acc.FirstName, acc.LastName,
 		acc.Number, acc.Balance, acc.CreatedAt)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	fmt.Printf("%+v\n", resp)
+	for rows.Next() {
+		return scanIntoAccount(rows)
+	}
 
-	return nil
+	return nil, fmt.Errorf("Failed to create account")
 }
 
 func (s *PostgresStore) GetAccounts() ([]*Account, error) {
